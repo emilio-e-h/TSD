@@ -1,0 +1,1848 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teoría de las Situaciones Didácticas - Aprendizaje Interactivo con Flashcards</title>
+    
+    <!-- ========================================== -->
+    <!-- RECURSOS EXTERNOS (Tailwind & Lucide)      -->
+    <!-- ========================================== -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        academic: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                            800: '#0c4a6e',
+                            900: '#0a304e'
+                        },
+                        success: '#10b981',
+                        error: '#ef4444'
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- ========================================== -->
+    <!-- ESTILOS (Equivalente a styles.css)         -->
+    <!-- ========================================== -->
+    <style>
+        /* Perspectiva y efectos 3D para la rotación de tarjetas */
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+        .preserve-3d {
+            transform-style: preserve-3d;
+        }
+        .backface-hidden {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .rotate-y-180 {
+            transform: rotateY(180deg);
+        }
+        .card-transition {
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* Barra de desplazamiento personalizada */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans selection:bg-academic-200">
+
+    <!-- ========================================== -->
+    <!-- ESTRUCTURA HTML (Equivalente a index.html) -->
+    <!-- ========================================== -->
+    
+    <!-- CABECERA DE LA APLICACIÓN -->
+    <header class="bg-academic-800 text-white shadow-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="goToMenu()">
+                <div class="p-1 bg-white/10 rounded-lg">
+                    <img src="images/logo-ens.jpg" alt="Logo ENS" class="w-12 h-12 md:w-16 md:h-16 object-contain">
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg md:text-xl leading-none">Escuela Normal de Sinaloa</h1>
+                    <span class="text-xs text-sky-200">Licenciatura en Enseñanza y Aprendizaje de las Matemáticas - 4° semestre</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <button id="soundToggle" onclick="toggleSound()" class="p-2 rounded-full hover:bg-white/10 text-white transition" title="Activar/Desactivar Sonidos">
+                    <i data-lucide="volume-2" id="soundIcon" class="w-5 h-5 text-sky-200"></i>
+                </button>
+                <button onclick="goToMenu()" class="flex items-center gap-1 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-sm font-medium transition">
+                    <i data-lucide="home" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Inicio</span>
+                </button>
+                <button onclick="openPresentation()" class="flex items-center gap-1 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-sm font-medium transition" title="Ver Presentación">
+                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Presentación</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Modal: Presentación PDF (responsive) -->
+    <div id="presentacionModal" onclick="onPresentacionOverlayClick(event)" class="fixed inset-0 z-50 hidden bg-black/50">
+        <div class="mx-auto my-auto bg-white w-full h-full md:w-11/12 md:h-4/5 lg:w-3/4 lg:h-4/5 xl:w-3/5 rounded-t-xl md:rounded-xl overflow-hidden shadow-lg flex flex-col">
+            <div class="flex items-center justify-between px-4 py-3 border-b">
+                <div class="flex items-center gap-3">
+                    <i data-lucide="file-text" class="w-5 h-5 text-slate-700"></i>
+                    <strong class="text-sm md:text-base">Presentación - Teoría de las Situaciones Didácticas</strong>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a id="presentacionDownload" href="PDF/TSD.PDF" download target="_blank" class="px-3 py-1 rounded-md bg-academic-600 text-white text-xs md:text-sm hover:bg-academic-700">Descargar</a>
+                    <button onclick="closePresentation()" class="px-3 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-xs md:text-sm">Cerrar</button>
+                </div>
+            </div>
+            <div class="flex-1 bg-slate-100 overflow-auto">
+                <iframe id="presentacionFrame" src="" class="w-full h-full border-0" title="Presentación TSD" allowfullscreen></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTENEDOR PRINCIPAL DINÁMICO -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col justify-center">
+
+        <!-- MENÚ PRINCIPAL -->
+        <section id="secMenu" class="space-y-8 py-6">
+            <div class="text-center max-w-3xl mx-auto space-y-4">
+                <div class="inline-flex p-3 bg-academic-100 text-academic-600 rounded-2xl mb-2">
+                    <i data-lucide="book-open" class="w-12 h-12"></i>
+                </div>
+                <h2 class="text-3xl md:text-5xl font-black text-academic-900 tracking-tight">
+                    Teoría de las Situaciones Didácticas (TSD)
+                </h2>
+                <p class="text-lg text-slate-600 max-w-xl mx-auto">
+                    Aprendizaje Interactivo con Flashcards
+                </p>
+                <div class="h-1 w-24 bg-academic-500 mx-auto rounded"></div>
+            </div>
+
+            <!-- Módulos de la Aplicación -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto pt-4">
+                <!-- Tarjeta: Modo Estudio -->
+                <div onclick="startEstudio()" class="group bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-academic-500 cursor-pointer transition duration-300 transform hover:-translate-y-1 flex flex-col justify-between">
+                    <div>
+                        <div class="p-3 bg-blue-50 text-blue-600 rounded-xl w-fit group-hover:bg-academic-600 group-hover:text-white transition duration-300">
+                            <i data-lucide="layers" class="w-8 h-8"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-800 mt-5 mb-2">Modo Estudio</h3>
+                        <p class="text-slate-600 text-sm">
+                            Repasa las 20 flashcards fundamentales. Memoriza definiciones clave de la teoría como el Medio, el Contrato Didáctico y las fases de la Situación Adidáctica.
+                        </p>
+                    </div>
+                    <div class="mt-6 flex items-center text-academic-600 font-semibold text-sm group-hover:translate-x-1 transition-transform">
+                        Comenzar Repaso <i data-lucide="arrow-right" class="w-4 h-4 ml-2"></i>
+                    </div>
+                </div>
+
+                <!-- Tarjeta: Modo Juego -->
+                <div onclick="openSetupJuego()" class="group bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-success cursor-pointer transition duration-300 transform hover:-translate-y-1 flex flex-col justify-between">
+                    <div>
+                        <div class="p-3 bg-emerald-50 text-success rounded-xl w-fit group-hover:bg-success group-hover:text-white transition duration-300">
+                            <i data-lucide="gamepad-2" class="w-8 h-8"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-800 mt-5 mb-2">Modo Juego</h3>
+                        <p class="text-slate-600 text-sm">
+                            ¡Ponte a prueba! Resuelve 20 preguntas aleatorias de diversos tipos. Registra tu puntaje y compite con tus compañeros en el ranking del grupo.
+                        </p>
+                    </div>
+                    <div class="mt-6 flex items-center text-success font-semibold text-sm group-hover:translate-x-1 transition-transform">
+                        Iniciar Desafío <i data-lucide="arrow-right" class="w-4 h-4 ml-2"></i>
+                    </div>
+                </div>
+
+                <!-- Tarjeta: Panel Docente -->
+                <div onclick="openAuthProfesor()" class="group bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-slate-800 cursor-pointer transition duration-300 transform hover:-translate-y-1 flex flex-col justify-between">
+                    <div>
+                        <div class="p-3 bg-slate-100 text-slate-700 rounded-xl w-fit group-hover:bg-slate-800 group-hover:text-white transition duration-300">
+                            <i data-lucide="shield-check" class="w-8 h-8"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-800 mt-5 mb-2">Panel del Profesor</h3>
+                        <p class="text-slate-600 text-sm">
+                            Presenta estadísticas globales de los intentos por Alumno, visualiza el Top 10, descarga el reporte oficial en CSV o gestiona la base de datos.
+                        </p>
+                    </div>
+                    <div class="mt-6 flex items-center text-slate-700 font-semibold text-sm group-hover:translate-x-1 transition-transform">
+                        Acceso Docente <i data-lucide="arrow-right" class="w-4 h-4 ml-2"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Podio Informativo -->
+            <div class="max-w-xl mx-auto bg-amber-50/50 border border-amber-200 rounded-xl p-4 flex items-center gap-4">
+                <div class="p-2 bg-amber-100 text-amber-700 rounded-lg">
+                    <i data-lucide="trophy" class="w-6 h-6 animate-bounce"></i>
+                </div>
+                <div class="text-sm">
+                    <span class="font-bold text-amber-900 block">¿Quién lidera el aula?</span>
+                    <span class="text-slate-600" id="liderSpan">Registra partidas en el Modo Juego para activar el podio de estudiantes.</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN: MODO ESTUDIO (FLASHCARDS) -->
+        <section id="secEstudio" class="hidden max-w-3xl mx-auto w-full space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-widest text-academic-600">Fase de Autoaprendizaje</span>
+                    <h3 class="text-2xl font-bold text-slate-800">Tarjetas de Estudio</h3>
+                </div>
+                <button onclick="goToMenu()" class="text-sm font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1">
+                    <i data-lucide="x" class="w-4 h-4"></i> Salir
+                </button>
+            </div>
+
+            <!-- Progreso Visual -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                <div class="flex justify-between text-sm font-medium">
+                    <span class="text-slate-500">Avance de estudio</span>
+                    <span class="text-academic-700 font-bold" id="estudioProgresoTexto">Tarjetas: 1 / 20</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2">
+                    <div id="estudioBarraProgreso" class="bg-academic-500 h-2 rounded-full transition-all duration-300" style="width: 5%"></div>
+                </div>
+            </div>
+
+            <!-- Visor de Flashcards (Efecto Flip) -->
+            <div class="perspective-1000 w-full h-[320px] md:h-[380px] cursor-pointer" onclick="flipEstudioCard()">
+                <div id="estudioCardInner" class="w-full h-full preserve-3d card-transition relative rounded-2xl shadow-md border border-slate-200">
+                    
+                    <!-- Anverso -->
+                    <div class="absolute inset-0 backface-hidden bg-white p-6 md:p-8 flex flex-col justify-between rounded-2xl">
+                        <div class="flex justify-between items-center text-slate-400 text-xs font-semibold">
+                            <span>ANVERSO ─ PREGUNTA</span>
+                            <span class="px-2 py-0.5 bg-slate-100 rounded-md text-slate-600" id="cardBadgeNumA">1 / 20</span>
+                        </div>
+                        <div class="flex-grow flex items-center justify-center text-center px-4">
+                            <h4 class="text-xl md:text-3xl font-bold text-academic-900 leading-snug" id="estudioAnversoTexto">
+                                ¿Qué es la Teoría de las Situaciones Didácticas?
+                            </h4>
+                        </div>
+                        <div class="flex items-center justify-center space-x-2 text-slate-400 text-xs">
+                            <i data-lucide="rotate-3d" class="w-4 h-4 animate-pulse"></i>
+                            <span>Haz clic para voltear la tarjeta y ver la definición</span>
+                        </div>
+                    </div>
+
+                    <!-- Reverso -->
+                    <div class="absolute inset-0 backface-hidden rotate-y-180 bg-gradient-to-br from-academic-800 to-academic-900 text-white p-6 md:p-8 flex flex-col justify-between rounded-2xl">
+                        <div class="flex justify-between items-center text-sky-200 text-xs font-semibold">
+                            <span>REVERSO ─ RESPUESTA</span>
+                            <span class="px-2 py-0.5 bg-white/10 rounded-md text-sky-200" id="cardBadgeNumR">1 / 20</span>
+                        </div>
+                        <div class="flex-grow flex items-center justify-center text-center overflow-y-auto px-4 py-2">
+                            <p class="text-md md:text-xl font-medium leading-relaxed" id="estudioReversoTexto">
+                                Marco teórico desarrollado por Guy Brousseau que explica cómo los estudiantes construyen conocimientos matemáticos mediante su interacción con situaciones diseñadas por el docente.
+                            </p>
+                        </div>
+                        <div class="flex items-center justify-center space-x-2 text-sky-300/80 text-xs">
+                            <i data-lucide="rotate-3d" class="w-4 h-4"></i>
+                            <span>Haz clic de nuevo para regresar a la pregunta</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Controles de Navegación de Flashcards -->
+            <div class="flex flex-col sm:flex-row items-center gap-4 justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="flex space-x-2 w-full sm:w-auto justify-center">
+                    <button onclick="shuffleEstudioCards()" class="flex items-center gap-1 px-4 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition">
+                        <i data-lucide="shuffle" class="w-4 h-4"></i> Barajar
+                    </button>
+                    <button onclick="resetEstudioSession()" class="flex items-center gap-1 px-4 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Reiniciar
+                    </button>
+                </div>
+
+                <div class="flex items-center justify-center space-x-3 w-full sm:w-auto">
+                    <button onclick="prevEstudioCard()" class="flex items-center justify-center w-12 h-12 rounded-full border border-slate-300 hover:bg-slate-50 text-slate-700 transition" id="btnEstudioPrev">
+                        <i data-lucide="chevron-left" class="w-6 h-6"></i>
+                    </button>
+                    <button onclick="flipEstudioCardDirect()" class="px-6 py-3 bg-academic-600 hover:bg-academic-700 text-white rounded-xl font-semibold shadow-md transition">
+                        Voltear Tarjeta
+                    </button>
+                    <button onclick="nextEstudioCard()" class="flex items-center justify-center w-12 h-12 rounded-full border border-slate-300 hover:bg-slate-50 text-slate-700 transition" id="btnEstudioNext">
+                        <i data-lucide="chevron-right" class="w-6 h-6"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN: REGISTRO / CONFIGURACIÓN DEL JUEGO -->
+        <section id="secJuegoSetup" class="hidden max-w-xl mx-auto w-full space-y-6">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-lg space-y-6">
+                <div class="text-center space-y-2">
+                    <span class="inline-block p-3 bg-amber-50 text-amber-600 rounded-full">
+                        <i data-lucide="user-plus" class="w-8 h-8"></i>
+                    </span>
+                    <h3 class="text-2xl font-bold text-slate-800">Registro de Alumno</h3>
+                    <p class="text-sm text-slate-500">Selecciona tu nombre de la lista para registrar oficialmente tu puntaje de aprendizaje.</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">Nombre Alumno:</label>
+                    <div class="relative">
+                        <select id="selectAlumno" class="w-full p-3 pl-10 pr-4 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-academic-500 focus:border-academic-500 transition appearance-none">
+                            <option value="">-- Selecciona tu nombre --</option>
+                            <option value="José Manuel">José Manuel</option>
+                            <option value="Jassiel">Jassiel</option>
+                            <option value="Ninfa">Ninfa</option>
+                            <option value="Misael">Misael</option>
+                            <option value="Frida">Frida</option>
+                            <option value="Mayte">Mayte</option>
+                            <option value="Karla">Karla</option>
+                            <option value="José Ricardo">José Ricardo</option>
+                            <option value="Dennys">Dennys</option>
+                            <option value="Juan">Juan</option>
+                            <option value="Lenny">Lenny</option>
+                            <option value="Christopher">Christopher</option>
+                            <option value="Nicole">Nicole</option>
+                            <option value="Sofía">Sofía</option>
+                            <option value="INVITADO">INVITADO</option>
+                        </select>
+                        <div class="absolute left-3.5 top-3.5 text-slate-400">
+                            <i data-lucide="user" class="w-5 h-5"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">Clave de Acceso:</label>
+                    <input id="inputAlumnoClave" type="password" placeholder="Ingresa tu clave (Nombre2026)" class="w-full p-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-academic-500 focus:border-academic-500">
+                    <p id="alumnoAuthError" class="text-sm text-red-500 mt-2 hidden">Clave incorrecta. La clave es tu nombre registrado seguido de 2026.</p>
+                </div>
+
+                <div class="bg-slate-50 p-4 rounded-xl space-y-2 text-xs text-slate-600 border border-slate-100">
+                    <span class="font-bold text-slate-700 block">Condiciones del juego:</span>
+                    <ul class="list-disc pl-4 space-y-1">
+                        <li>Se formularán <strong>20 preguntas</strong> sobre conceptos de la Teoría de las Situaciones Didácticas.</li>
+                        <li>Se califica de forma automática sobre una base de <strong>10 puntos</strong>.</li>
+                        <li>Las preguntas son dinámicas y aleatorias (opción múltiple, completar, relacionar y V/F).</li>
+                        <li>Se medirá el tiempo exacto. Tu registro será enviado al Panel del Profesor automáticamente.</li>
+                    </ul>
+                </div>
+
+                <div class="flex space-x-3">
+                    <button onclick="goToMenu()" class="flex-1 py-3 border border-slate-300 hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-700 transition">
+                        Cancelar
+                    </button>
+                    <button onclick="startJuego()" class="flex-1 py-3 bg-success hover:bg-emerald-600 text-white rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition">
+                        Comenzar Juego
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN: PANTALLA DE JUEGO ACTIVO -->
+        <section id="secJuego" class="hidden max-w-4xl mx-auto w-full space-y-6">
+            <!-- Marcadores del Juego -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <!-- Alumno -->
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-slate-100 rounded-lg text-slate-600">
+                        <i data-lucide="user" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 block">Estudiante</span>
+                        <span class="text-sm font-bold text-slate-700" id="juegoAlumnoSpan">Nombre Alumno</span>
+                    </div>
+                </div>
+
+                <!-- Temporizador -->
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-amber-50 rounded-lg text-amber-600">
+                        <i data-lucide="clock" class="w-5 h-5 animate-spin"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 block">Tiempo transcurrido</span>
+                        <span class="text-sm font-bold text-slate-700 font-mono" id="juegoTimerSpan">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Progreso -->
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-academic-50 rounded-lg text-academic-600">
+                        <i data-lucide="help-circle" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-400 block">Pregunta actual</span>
+                        <span class="text-sm font-bold text-slate-700" id="juegoProgresoTexto">1 / 20</span>
+                    </div>
+                </div>
+
+                <!-- Aciertos/Errores -->
+                <div class="flex items-center justify-between bg-slate-50 p-2 rounded-xl">
+                    <div class="text-center flex-1">
+                        <span class="text-[10px] text-slate-400 font-bold block">ACIERTOS</span>
+                        <span class="text-sm font-extrabold text-success" id="juegoAciertosSpan">0</span>
+                    </div>
+                    <div class="w-px h-6 bg-slate-200"></div>
+                    <div class="text-center flex-1">
+                        <span class="text-[10px] text-slate-400 font-bold block">ERRORES</span>
+                        <span class="text-sm font-extrabold text-error" id="juegoErroresSpan">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progreso Visual -->
+            <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                <div id="juegoBarraProgreso" class="bg-gradient-to-r from-academic-500 to-success h-full transition-all duration-300" style="width: 5%"></div>
+            </div>
+
+            <!-- Tarjeta de Pregunta Activa -->
+            <div class="bg-white p-6 md:p-8 rounded-2xl border border-slate-200 shadow-md space-y-6">
+                <div class="flex justify-between items-center">
+                    <span id="badgeTipoPregunta" class="px-3 py-1 bg-academic-100 text-academic-700 text-xs font-bold rounded-full uppercase tracking-wider">
+                        Opción Múltiple
+                    </span>
+                    <span class="text-xs text-slate-400 font-mono" id="userIdPartida">ID: ABCDEF12</span>
+                </div>
+
+                <div class="space-y-2">
+                    <h4 class="text-xl md:text-2xl font-bold text-slate-800 leading-snug" id="juegoEnunciado">
+                        ¿Pregunta?
+                    </h4>
+                    <p class="text-sm text-slate-500" id="juegoInstruccion">Instrucción para responder.</p>
+                </div>
+
+                <!-- Zona de Respuestas -->
+                <div id="juegoZonaRespuestas" class="grid grid-cols-1 gap-4 pt-2">
+                    <!-- Respuestas inyectadas por JS -->
+                </div>
+
+                <div class="flex justify-end pt-4 border-t border-slate-100">
+                    <button id="btnResponder" onclick="verificarRespuesta()" class="px-6 py-3 bg-academic-600 hover:bg-academic-700 text-white rounded-xl font-bold shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        Comprobar Respuesta
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN: RESULTADOS DE PARTIDA -->
+        <section id="secJuegoResultados" class="hidden max-w-2xl mx-auto w-full space-y-6">
+            <div class="bg-white p-8 rounded-2xl border border-slate-200 shadow-xl text-center space-y-6">
+                <div class="inline-flex p-4 bg-emerald-100 text-success rounded-full animate-bounce">
+                    <i data-lucide="party-popper" class="w-12 h-12"></i>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="text-3xl font-black text-slate-800">¡Juego Terminado!</h3>
+                    <p class="text-slate-500">Resultados del Examen de Teoría de las Situaciones Didácticas.</p>
+                </div>
+
+                <div class="bg-gradient-to-br from-slate-50 to-slate-100 p-6 rounded-2xl border border-slate-200 grid grid-cols-2 gap-4 max-w-md mx-auto">
+                    <div class="text-left space-y-1 border-r border-slate-200 pr-2">
+                        <span class="text-xs text-slate-400 font-bold block">ALUMNO</span>
+                        <span class="text-lg font-bold text-slate-700 block truncate" id="resAlumno">Nombre</span>
+                        
+                        <span class="text-xs text-slate-400 font-bold block mt-3">REGISTRO DE PARTIDA</span>
+                        <span class="text-[11px] font-semibold text-slate-600" id="resFecha">01/01/2026 - 12:00</span>
+                    </div>
+
+                    <div class="flex flex-col justify-center items-center">
+                        <span class="text-xs text-slate-400 font-bold uppercase tracking-wider">Nota Final</span>
+                        <div class="text-5xl font-black text-academic-600 mt-1" id="resNota">0.0</div>
+                        <span class="text-xs font-semibold text-slate-500 mt-1">sobre 10 puntos</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 max-w-md mx-auto text-center">
+                    <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                        <span class="text-xs text-success font-bold block">Aciertos</span>
+                        <span class="text-xl font-extrabold text-slate-800" id="resAciertos">0</span>
+                    </div>
+                    <div class="p-3 bg-red-50 rounded-xl border border-red-100">
+                        <span class="text-xs text-error font-bold block">Errores</span>
+                        <span class="text-xl font-extrabold text-slate-800" id="resErrores">0</span>
+                    </div>
+                    <div class="p-3 bg-amber-50 rounded-xl border border-amber-100">
+                        <span class="text-xs text-amber-700 font-bold block">Tiempo</span>
+                        <span class="text-xl font-extrabold text-slate-800" id="resTiempo">00:00</span>
+                    </div>
+                </div>
+
+                <p class="text-sm italic text-slate-500 max-w-sm mx-auto" id="resFeedbackTexto">
+                    Comentario de evaluación docente.
+                </p>
+
+                <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4 max-w-md mx-auto">
+                    <button onclick="goToMenu()" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition flex items-center justify-center gap-1">
+                        <i data-lucide="home" class="w-4 h-4"></i> Volver al Inicio
+                    </button>
+                    <button onclick="openSetupJuego()" class="flex-1 py-3 bg-academic-600 hover:bg-academic-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-1">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Jugar de Nuevo
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN: AUTENTICACIÓN DOCENTE -->
+        <section id="secProfesorAuth" class="hidden max-w-md mx-auto w-full">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl space-y-6">
+                <div class="text-center space-y-2">
+                    <div class="inline-flex p-3 bg-slate-100 text-slate-700 rounded-full">
+                        <i data-lucide="lock" class="w-8 h-8"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-slate-800">Acceso Docente</h3>
+                    <p class="text-sm text-slate-500">Ingresa la clave de administración para acceder al historial.</p>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Clave de Seguridad:</label>
+                        <input type="password" id="inputProfesorPass" placeholder="••••••••••••" class="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-slate-800 focus:border-slate-800 transition">
+                    </div>
+                    <div id="authErrorMsg" class="hidden text-xs font-bold text-error bg-red-50 p-2.5 rounded-lg border border-red-100">
+                        Clave incorrecta. Por favor, revisa tus credenciales.
+                    </div>
+                </div>
+
+                <div class="flex space-x-3">
+                    <button onclick="goToMenu()" class="flex-1 py-3 border border-slate-300 hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-700 transition">
+                        Cancelar
+                    </button>
+                    <button onclick="verificarProfesorAuth()" class="flex-1 py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-sm font-bold shadow-md transition">
+                        Validar Clave
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN: PANEL DE CONTROL DOCENTE -->
+        <section id="secProfesorDashboard" class="hidden space-y-8 w-full">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
+                <div>
+                    <div class="flex items-center space-x-2 text-slate-500 text-xs font-bold tracking-wider uppercase mb-1">
+                        <i data-lucide="shield" class="w-4 h-4"></i>
+                        <span>Administración General</span>
+                    </div>
+                    <h3 class="text-3xl font-black text-slate-800">Métricas y Resultados Escolares</h3>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <button onclick="exportarCSV()" class="flex items-center gap-1.5 px-4 py-2.5 bg-success hover:bg-emerald-600 text-white font-bold text-sm rounded-xl transition shadow-sm">
+                        <i data-lucide="download" class="w-4 h-4"></i> Reporte CSV (Excel)
+                    </button>
+                    <button onclick="mostrarConfirmacionBorrar()" class="flex items-center gap-1.5 px-4 py-2.5 bg-red-100 hover:bg-red-200 text-error font-bold text-sm rounded-xl transition">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i> Resetear Datos
+                    </button>
+                    <button onclick="cerrarSesionProfesor()" class="flex items-center gap-1 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl transition">
+                        Salir del Panel
+                    </button>
+                </div>
+            </div>
+
+            <!-- Resumen Estadístico -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div class="space-y-1">
+                        <span class="text-xs text-slate-400 font-bold block uppercase">Intentos Totales</span>
+                        <span class="text-3xl font-black text-slate-800 block" id="statIntentos">0</span>
+                        <span class="text-xs text-slate-500">Evaluaciones resueltas</span>
+                    </div>
+                    <div class="p-3.5 bg-blue-50 text-blue-600 rounded-xl">
+                        <i data-lucide="users" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div class="space-y-1">
+                        <span class="text-xs text-slate-400 font-bold block uppercase">Promedio del Grupo</span>
+                        <span class="text-3xl font-black text-academic-600 block" id="statPromedio">0.0</span>
+                        <span class="text-xs text-slate-500">Nota media grupal</span>
+                    </div>
+                    <div class="p-3.5 bg-sky-50 text-sky-600 rounded-xl">
+                        <i data-lucide="award" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div class="space-y-1">
+                        <span class="text-xs text-slate-400 font-bold block uppercase">Calificación Máxima</span>
+                        <span class="text-3xl font-black text-success block" id="statMejorNota">0.0</span>
+                        <span class="text-xs text-slate-500">Mayor nota registrada</span>
+                    </div>
+                    <div class="p-3.5 bg-emerald-50 text-success rounded-xl">
+                        <i data-lucide="trending-up" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div class="space-y-1">
+                        <span class="text-xs text-slate-400 font-bold block uppercase">Tiempo Récor</span>
+                        <span class="text-3xl font-black text-amber-600 block font-mono" id="statMejorTiempo">--:--</span>
+                        <span class="text-xs text-slate-500">Menor tiempo de juego</span>
+                    </div>
+                    <div class="p-3.5 bg-amber-50 text-amber-600 rounded-xl">
+                        <i data-lucide="zap" class="w-6 h-6"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ranking y Distribución -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Top 10 Alumnos -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 lg:col-span-1">
+                    <div class="flex items-center space-x-2 pb-2 border-b border-slate-100">
+                        <i data-lucide="crown" class="text-amber-500 w-5 h-5"></i>
+                        <h4 class="text-lg font-bold text-slate-800">Top 10 Alumnos</h4>
+                    </div>
+                    <div class="space-y-3 max-h-[380px] overflow-y-auto pr-1" id="top10Container">
+                        <!-- Generado dinámicamente -->
+                    </div>
+                </div>
+
+                <!-- Gráfica de distribución de calificaciones -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 lg:col-span-2 flex flex-col justify-between">
+                    <div class="space-y-1">
+                        <h4 class="text-lg font-bold text-slate-800">Distribución de Calificaciones</h4>
+                        <p class="text-xs text-slate-400">Representación estadística del rendimiento escolar.</p>
+                    </div>
+
+                    <div class="h-44 flex items-end justify-between px-2 pt-4 border-b border-slate-200 gap-2" id="graficoDistribucion">
+                        <!-- Columnas renderizadas por JS -->
+                    </div>
+                    <div class="flex justify-between text-[10px] text-slate-400 font-bold px-1 mt-1">
+                        <span>Bajo (0 - 5.9)</span>
+                        <span>Medio (6.0 - 7.9)</span>
+                        <span>Alto (8.0 - 9.9)</span>
+                        <span>Excelente (10)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Historial de Partidas -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h4 class="text-lg font-bold text-slate-800">Lista Completa de Resultados</h4>
+                        <p class="text-xs text-slate-500">Base de datos de calificaciones organizadas cronológicamente.</p>
+                    </div>
+                    <div class="relative w-full sm:w-64">
+                        <input type="text" id="tablaFiltroInput" oninput="filtrarHistorial()" placeholder="Buscar alumno..." class="w-full text-sm p-2 pl-8 border border-slate-300 rounded-lg focus:ring-1 focus:ring-slate-700 focus:border-slate-700">
+                        <div class="absolute left-2.5 top-3 text-slate-400">
+                            <i data-lucide="search" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider border-b border-slate-100">
+                                <th class="p-4">Estudiante</th>
+                                <th class="p-4">ID Partida</th>
+                                <th class="p-4">Fecha y Hora</th>
+                                <th class="p-4">Duración</th>
+                                <th class="p-4 text-center">Aciertos</th>
+                                <th class="p-4 text-center">Errores</th>
+                                <th class="p-4 text-right">Nota Final</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historialTableBody" class="divide-y divide-slate-100 text-sm">
+                            <!-- Filas inyectadas -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="noDataMsg" class="hidden p-8 text-center text-slate-400 text-sm">
+                    <i data-lucide="folder-open" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
+                    No hay registros disponibles.
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- VENTANAS MODALES -->
+    <div id="modalConfirmarBorrar" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl border border-slate-100 animate-zoom-in">
+            <div class="text-center space-y-2">
+                <div class="inline-flex p-3 bg-red-100 text-error rounded-full">
+                    <i data-lucide="alert-triangle" class="w-8 h-8"></i>
+                </div>
+                <h4 class="text-lg font-bold text-slate-800">¿Deseas vaciar el historial?</h4>
+                <p class="text-sm text-slate-500">Esta acción eliminará de forma irreversible el historial de calificaciones y estadísticas. Los datos locales de los alumnos se perderán por completo.</p>
+            </div>
+            <div class="flex space-x-3 pt-2">
+                <button onclick="ocultarConfirmacionBorrar()" class="flex-1 py-2.5 border border-slate-200 hover:bg-slate-50 text-sm font-semibold rounded-xl text-slate-700 transition">
+                    Cancelar
+                </button>
+                <button onclick="borrarHistorialTotal()" class="flex-1 py-2.5 bg-error hover:bg-red-600 text-white text-sm font-bold rounded-xl transition">
+                    Confirmar Borrado
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PIE DE PÁGINA -->
+    <footer class="bg-slate-100 border-t border-slate-200 py-6 mt-12 text-slate-500 text-xs">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="text-center sm:text-left space-y-1">
+                <p class="font-semibold text-slate-700">Curso: Didáctica de las Matemáticas en Educación Básica</p>
+                <p class="font-semibold text-slate-700">© Junio 2026. Mtro. Emilio Escalante.</p>
+            </div>
+                <div class="flex items-center space-x-2 bg-slate-200/50 px-3 py-1.5 rounded-lg text-slate-600 font-medium">
+                <i data-lucide="shield-alert" class="w-4 h-4 text-slate-400"></i>
+                <span>Basado en la Teoría de las Situaciones Didácticas de Guy Brousseau</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ========================================== -->
+    <!-- LÓGICA JAVASCRIPT (Equivalente a script.js) -->
+    <!-- ========================================== -->
+    <script>
+        // --- BASE DE DATOS ESTRUCTURAL DE FLASHCARDS (TSD) ---
+        const FLASHCARDS_DB = [
+            {
+                id: 1,
+                anverso: "¿Qué es la Teoría de las Situaciones Didácticas?",
+                reverso: "Marco teórico desarrollado por Guy Brousseau que explica cómo los estudiantes construyen conocimientos matemáticos mediante su interacción con situaciones diseñadas por el docente."
+            },
+            {
+                id: 2,
+                anverso: "¿Quién desarrolló la Teoría de las Situaciones Didácticas?",
+                reverso: "Guy Brousseau (1933-2024), investigador francés y fundador de la Teoría de las Situaciones Didácticas."
+            },
+            {
+                id: 3,
+                anverso: "¿Cuál es la idea central de la Teoría de las Situaciones Didácticas?",
+                reverso: "El alumno construye conocimiento mediante su interacción con un medio diseñado por el docente y no únicamente por transmisión directa."
+            },
+            {
+                id: 4,
+                anverso: "¿Qué es una Situación Didáctica?",
+                reverso: "Conjunto de relaciones entre alumno, medio y sistema educativo para favorecer la construcción de un saber."
+            },
+            {
+                id: 5,
+                anverso: "¿Qué es el Contrato Didáctico?",
+                reverso: "Conjunto de normas, expectativas y acuerdos que regulan la relación entre docente y estudiantes."
+            },
+            {
+                id: 6,
+                anverso: "¿Qué es el Medio (Milieu)?",
+                reverso: "Sistema de objetos, reglas, representaciones, restricciones y retroacciones con los que interactúa el estudiante."
+            },
+            {
+                id: 7,
+                anverso: "¿Qué son las Variables Didácticas?",
+                reverso: "Elementos de una situación que el docente modifica para provocar diferentes estrategias y razonamientos."
+            },
+            {
+                id: 8,
+                anverso: "¿Qué es la Devolución?",
+                reverso: "Proceso mediante el cual el docente transfiere al alumno la responsabilidad intelectual de resolver un problema."
+            },
+            {
+                id: 9,
+                anverso: "¿Qué es una Situación Adidáctica?",
+                reverso: "Momento en que el estudiante interactúa autónomamente con el problema y el medio sin intervención directa del docente."
+            },
+            {
+                id: 10,
+                anverso: "Primera fase de una Situación Adidáctica",
+                reverso: "Acción: el estudiante explora, prueba y experimenta estrategias."
+            },
+            {
+                id: 11,
+                anverso: "Segunda fase de una Situación Adidáctica",
+                reverso: "Formulación: los estudiantes comunican y explican sus procedimientos."
+            },
+            {
+                id: 12,
+                anverso: "Tercera fase de una Situación Adidáctica",
+                reverso: "Validación: los estudiantes justifican y verifican sus resultados."
+            },
+            {
+                id: 13,
+                anverso: "¿Qué es la Institucionalización?",
+                reverso: "Intervención del docente para formalizar el conocimiento construido por los estudiantes."
+            },
+            {
+                id: 14,
+                anverso: "¿Qué papel tiene el Error en la Teoría de las Situaciones Didácticas?",
+                reverso: "Es evidencia del razonamiento del estudiante y una oportunidad para construir nuevos conocimientos."
+            },
+            {
+                id: 15,
+                anverso: "Qué es un Obstáculo Epistemológico?",
+                reverso: "Conocimiento previo que fue útil en ciertos contextos pero resulta insuficiente en otros."
+            },
+            {
+                id: 16,
+                anverso: "¿Qué es un Obstáculo Didáctico?",
+                reverso: "Dificultad generada por la forma en que se enseña un contenido."
+            },
+            {
+                id: 17,
+                anverso: "¿Qué es un Obstáculo Cognitivo?",
+                reverso: "Dificultad relacionada con procesos de razonamiento o representación."
+            },
+            {
+                id: 18,
+                anverso: "¿Qué es la Transposición Didáctica?",
+                reverso: "Proceso mediante el cual el saber científico se transforma en saber enseñado."
+            },
+            {
+                id: 19,
+                anverso: "¿Quién popularizó la Transposición Didáctica?",
+                reverso: "Yves Chevallard (1946-2026)."
+            },
+            {
+                id: 20,
+                anverso: "¿Qué es la Vigilancia Epistemológica?",
+                reverso: "Proceso mediante el cual el docente verifica que el conocimiento enseñado conserve su rigor científico."
+            }
+        ];
+
+        // --- SISTEMA NATIVO DE AUDIO (AUDIO SINTETIZADO) ---
+        const soundController = {
+            enabled: true,
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+            playSuccess() {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    let osc = this.ctx.createOscillator();
+                    let gain = this.ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, this.ctx.currentTime); // C5
+                    osc.frequency.setValueAtTime(659.25, this.ctx.currentTime + 0.1); // E5
+                    osc.frequency.setValueAtTime(783.99, this.ctx.currentTime + 0.2); // G5
+                    
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.45);
+                    
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.5);
+                } catch (e) {
+                    console.warn("Audio Context bloqueado o no disponible");
+                }
+            },
+            playError() {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    let osc = this.ctx.createOscillator();
+                    let gain = this.ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220.00, this.ctx.currentTime); // A3
+                    osc.frequency.linearRampToValueAtTime(140.00, this.ctx.currentTime + 0.35);
+                    
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
+                    
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.4);
+                } catch (e) {
+                    console.warn("Audio Context bloqueado o no disponible");
+                }
+            }
+        };
+
+        function toggleSound() {
+            soundController.enabled = !soundController.enabled;
+            const soundIcon = document.getElementById("soundIcon");
+            if (soundController.enabled) {
+                soundIcon.setAttribute("data-lucide", "volume-2");
+                soundIcon.className = "w-5 h-5 text-sky-200";
+            } else {
+                soundIcon.setAttribute("data-lucide", "volume-x");
+                soundIcon.className = "w-5 h-5 text-red-300";
+            }
+            lucide.createIcons();
+        }
+
+        // --- ESTADO GLOBAL DE LA APLICACIÓN ---
+        let appState = {
+            currentSection: 'secMenu',
+            estudio: {
+                cards: [...FLASHCARDS_DB],
+                currentIndex: 0,
+                flipped: false
+            },
+            juego: {
+                alumno: "",
+                idUsuario: "",
+                fecha: "",
+                hora: "",
+                preguntas: [],
+                currentIndex: 0,
+                aciertos: 0,
+                errores: 0,
+                segundos: 0,
+                timerInterval: null,
+                respuestaSeleccionada: null,
+                respondido: false
+            }
+        };
+
+        // --- SISTEMA DE CONTROL DE VISTAS (ENRUTADOR) ---
+        function showSection(sectionId) {
+            document.getElementById(appState.currentSection).classList.add('hidden');
+            const nextSec = document.getElementById(sectionId);
+            nextSec.classList.remove('hidden');
+            appState.currentSection = sectionId;
+            
+            lucide.createIcons();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function goToMenu() {
+            if (appState.juego.timerInterval) {
+                clearInterval(appState.juego.timerInterval);
+                appState.juego.timerInterval = null;
+            }
+            actualizarLiderEstadisticas();
+            showSection('secMenu');
+        }
+
+        // Abrir modal de presentación (PDF)
+        function openPresentation() {
+            const modal = document.getElementById('presentacionModal');
+            const iframe = document.getElementById('presentacionFrame');
+            const dl = document.getElementById('presentacionDownload');
+            // Establecer rutas relativas
+            const pdfPath = 'PDF/TSD.PDF';
+            iframe.src = pdfPath;
+            dl.href = pdfPath;
+            modal.classList.remove('hidden');
+            // Mostrar modal centrado y asegurar scroll en móviles
+            modal.classList.add('flex');
+            modal.style.alignItems = 'center';
+            modal.style.justifyContent = 'center';
+        }
+
+        function closePresentation() {
+            const modal = document.getElementById('presentacionModal');
+            const iframe = document.getElementById('presentacionFrame');
+            // Limpiar src para detener la carga/pdf embebido
+            try { iframe.src = 'about:blank'; } catch (e) {}
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            modal.style.alignItems = '';
+            modal.style.justifyContent = '';
+        }
+
+        function onPresentacionOverlayClick(e) {
+            // Cerrar solo si el clic fue en el overlay (no en el panel)
+            const modal = document.getElementById('presentacionModal');
+            if (e.target === modal) {
+                closePresentation();
+            }
+        }
+
+        // --- INICIALIZADOR AL CARGAR EL DOCUMENTO ---
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            actualizarLiderEstadisticas();
+            
+            document.getElementById("inputProfesorPass").addEventListener("keyup", function(event) {
+                if (event.key === "Enter") {
+                    verificarProfesorAuth();
+                }
+            });
+
+            // Cerrar modal de presentación con tecla Esc
+            document.addEventListener('keydown', function(ev) {
+                if (ev.key === 'Escape') {
+                    const modal = document.getElementById('presentacionModal');
+                    if (modal && !modal.classList.contains('hidden')) {
+                        closePresentation();
+                    }
+                }
+            });
+        });
+
+        // ==========================================
+        // LÓGICA DE CONTROL: MODO ESTUDIO
+        // ==========================================
+        function startEstudio() {
+            appState.estudio.cards = [...FLASHCARDS_DB];
+            appState.estudio.currentIndex = 0;
+            appState.estudio.flipped = false;
+            renderEstudioCard();
+            showSection('secEstudio');
+        }
+
+        function renderEstudioCard() {
+            const card = appState.estudio.cards[appState.estudio.currentIndex];
+            const numTotal = appState.estudio.cards.length;
+            const currentNum = appState.estudio.currentIndex + 1;
+            
+            document.getElementById("estudioAnversoTexto").textContent = card.anverso;
+            document.getElementById("estudioReversoTexto").textContent = card.reverso;
+            
+            document.getElementById("cardBadgeNumA").textContent = `${currentNum} / ${numTotal}`;
+            document.getElementById("cardBadgeNumR").textContent = `${currentNum} / ${numTotal}`;
+            
+            const porcentaje = (currentNum / numTotal) * 100;
+            document.getElementById("estudioBarraProgreso").style.width = `${porcentaje}%`;
+            document.getElementById("estudioProgresoTexto").textContent = `Tarjetas estudiadas: ${currentNum} de ${numTotal}`;
+            
+            appState.estudio.flipped = false;
+            document.getElementById("estudioCardInner").classList.remove('rotate-y-180');
+            
+            document.getElementById("btnEstudioPrev").disabled = (appState.estudio.currentIndex === 0);
+            document.getElementById("btnEstudioNext").disabled = (appState.estudio.currentIndex === numTotal - 1);
+            
+            document.getElementById("btnEstudioPrev").style.opacity = (appState.estudio.currentIndex === 0) ? "0.4" : "1";
+            document.getElementById("btnEstudioNext").style.opacity = (appState.estudio.currentIndex === numTotal - 1) ? "0.4" : "1";
+        }
+
+        function flipEstudioCard() {
+            const cardInner = document.getElementById("estudioCardInner");
+            appState.estudio.flipped = !appState.estudio.flipped;
+            if (appState.estudio.flipped) {
+                cardInner.classList.add('rotate-y-180');
+            } else {
+                cardInner.classList.remove('rotate-y-180');
+            }
+        }
+
+        function flipEstudioCardDirect() {
+            flipEstudioCard();
+        }
+
+        function nextEstudioCard() {
+            if (appState.estudio.currentIndex < appState.estudio.cards.length - 1) {
+                appState.estudio.currentIndex++;
+                renderEstudioCard();
+            }
+        }
+
+        function prevEstudioCard() {
+            if (appState.estudio.currentIndex > 0) {
+                appState.estudio.currentIndex--;
+                renderEstudioCard();
+            }
+        }
+
+        function shuffleEstudioCards() {
+            for (let i = appState.estudio.cards.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [appState.estudio.cards[i], appState.estudio.cards[j]] = [appState.estudio.cards[j], appState.estudio.cards[i]];
+            }
+            appState.estudio.currentIndex = 0;
+            renderEstudioCard();
+        }
+
+        function resetEstudioSession() {
+            appState.estudio.cards = [...FLASHCARDS_DB];
+            appState.estudio.currentIndex = 0;
+            renderEstudioCard();
+        }
+
+        // ==========================================
+        // LÓGICA DE CONTROL: MODO JUEGO
+        // ==========================================
+        function openSetupJuego() {
+            document.getElementById("selectAlumno").value = "";
+            showSection('secJuegoSetup');
+        }
+
+        function startJuego() {
+            const selectedAlumno = document.getElementById("selectAlumno").value;
+            if (!selectedAlumno) {
+                alert("Por favor, selecciona tu nombre de la lista oficial de estudiantes.");
+                return;
+            }
+
+            appState.juego.alumno = selectedAlumno;
+            appState.juego.idUsuario = generateShortID();
+            
+            const ahora = new Date();
+            const dia = String(ahora.getDate()).padStart(2, '0');
+            const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+            const anio = ahora.getFullYear();
+            const hora = String(ahora.getHours()).padStart(2, '0');
+            const min = String(ahora.getMinutes()).padStart(2, '0');
+            
+            appState.juego.fecha = `${dia}/${mes}/${anio}`;
+            appState.juego.hora = `${hora}:${min}`;
+            appState.juego.aciertos = 0;
+            appState.juego.errores = 0;
+            appState.juego.segundos = 0;
+            appState.juego.currentIndex = 0;
+            appState.juego.respondido = false;
+            appState.juego.respuestaSeleccionada = null;
+
+            appState.juego.preguntas = generarCuestionarioCompleto(FLASHCARDS_DB);
+            
+            document.getElementById("juegoAlumnoSpan").textContent = appState.juego.alumno;
+            document.getElementById("juegoTimerSpan").textContent = "00:00";
+            document.getElementById("juegoAciertosSpan").textContent = "0";
+            document.getElementById("juegoErroresSpan").textContent = "0";
+            document.getElementById("userIdPartida").textContent = `ID: ${appState.juego.idUsuario}`;
+            
+            if (appState.juego.timerInterval) clearInterval(appState.juego.timerInterval);
+            appState.juego.timerInterval = setInterval(() => {
+                appState.juego.segundos++;
+                const mins = String(Math.floor(appState.juego.segundos / 60)).padStart(2, '0');
+                const secs = String(appState.juego.segundos % 60).padStart(2, '0');
+                document.getElementById("juegoTimerSpan").textContent = `${mins}:${secs}`;
+            }, 1000);
+
+            renderJuegoPregunta();
+            showSection('secJuego');
+        }
+
+        function generateShortID() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let res = '';
+            for (let i = 0; i < 8; i++) {
+                res += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return res;
+        }
+
+        // Genera 20 preguntas balanceadas
+        function generarCuestionarioCompleto(base) {
+            let copia = [...base];
+            for (let i = copia.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [copia[i], copia[j]] = [copia[j], copia[i]];
+            }
+
+            let tipos = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3];
+            for (let i = tipos.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [tipos[i], tipos[j]] = [tipos[j], tipos[i]];
+            }
+
+            return copia.map((card, index) => {
+                const tipo = tipos[index];
+                return construirPreguntaSegunTipo(card, tipo, base);
+            });
+        }
+
+        function construirPreguntaSegunTipo(cardTarget, tipo, todasLasCards) {
+            let pregunta = {
+                idFlashcard: cardTarget.id,
+                tipo: tipo, // 0: Múltiple, 1: V/F, 2: Relacionar, 3: Completar
+                enunciado: "",
+                instruccion: "",
+                opciones: [],
+                feedbackCorrecto: cardTarget.reverso
+            };
+
+            if (tipo === 0) {
+                pregunta.enunciado = cardTarget.anverso;
+                pregunta.instruccion = "Selecciona la respuesta correcta de las siguientes opciones:";
+                pregunta.opciones.push({ texto: cardTarget.reverso, correcto: true });
+
+                // Obtener hasta 3 distractores con textos únicos distintos al correcto
+                const distractorTexts = getUniqueDistractorsText(todasLasCards, cardTarget.id, cardTarget.reverso, c => c.reverso, 3);
+                distractorTexts.forEach(t => pregunta.opciones.push({ texto: t, correcto: false }));
+
+                pregunta.opciones.sort(() => 0.5 - Math.random());
+
+            } else if (tipo === 1) {
+                const esVerdadero = Math.random() >= 0.5;
+                pregunta.enunciado = `Respecto a "${cardTarget.anverso}", se afirma que: "${esVerdadero ? cardTarget.reverso : obtenerReversoFalso(cardTarget, todasLasCards)}"`;
+                pregunta.instruccion = "¿Esta afirmación es verdadera o falsa?";
+                
+                pregunta.opciones.push({ texto: "Verdadero", correcto: esVerdadero });
+                pregunta.opciones.push({ texto: "Falso", correcto: !esVerdadero });
+
+            } else if (tipo === 2) {
+                const conceptoClave = extraerConceptoClave(cardTarget.anverso);
+                pregunta.enunciado = `Empareja correctamente el concepto clave de la Teoría de las Situaciones Didácticas: "${conceptoClave}"`;
+                pregunta.instruccion = "Selecciona la definición correspondiente:";
+
+                pregunta.opciones.push({ texto: cardTarget.reverso, correcto: true });
+                const distractorTexts = getUniqueDistractorsText(todasLasCards, cardTarget.id, cardTarget.reverso, c => c.reverso, 3);
+                distractorTexts.forEach(t => pregunta.opciones.push({ texto: t, correcto: false }));
+
+                pregunta.opciones.sort(() => 0.5 - Math.random());
+
+            } else {
+                const conceptoOculto = extraerConceptoClave(cardTarget.anverso);
+                const definicionOriginal = cardTarget.reverso;
+                
+                let definicionConHueco = definicionOriginal;
+                const regex = new RegExp(conceptoOculto, 'gi');
+                    if (regex.test(definicionOriginal)) {
+                        definicionConHueco = definicionOriginal.replace(regex, "__________________");
+                    } else {
+                        const terminoPref = obtenerTerminoPreferido(definicionOriginal) || conceptoOculto;
+                        definicionConHueco = generarFragmentoHueco(definicionOriginal, terminoPref);
+                    }
+
+                pregunta.enunciado = `Completa la siguiente definición vacía: "${definicionConHueco}"`;
+                pregunta.instruccion = "Selecciona el término o concepto correcto que rellena el espacio en blanco:";
+                
+                pregunta.opciones.push({ texto: conceptoOculto, correcto: true });
+
+                // Para completar, extraemos conceptos únicos de anversos distintos
+                const distractorConcepts = getUniqueDistractorsText(todasLasCards, cardTarget.id, conceptoOculto, c => extraerConceptoClave(c.anverso), 3);
+                distractorConcepts.forEach(t => pregunta.opciones.push({ texto: t, correcto: false }));
+
+                pregunta.opciones.sort(() => 0.5 - Math.random());
+            }
+
+            return pregunta;
+        }
+
+        function obtenerReversoFalso(cardTarget, todas) {
+            let filtro = todas.filter(c => c.id !== cardTarget.id);
+            filtro.sort(() => 0.5 - Math.random());
+            return filtro[0].reverso;
+        }
+
+        // Devuelve un array de textos únicos (transformFn) distintos del targetText
+        function getUniqueDistractorsText(todas, cardId, targetText, transformFn, needed) {
+            let pool = todas.filter(c => c.id !== cardId);
+            for (let i = pool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pool[i], pool[j]] = [pool[j], pool[i]];
+            }
+
+            const results = [];
+            for (let i = 0; i < pool.length && results.length < needed; i++) {
+                const text = (typeof transformFn === 'function') ? transformFn(pool[i]) : pool[i];
+                if (!text) continue;
+                const a = text.trim();
+                const b = targetText ? targetText.trim() : '';
+                if (a === '') continue;
+                if (b !== '' && a === b) continue;
+                if (results.some(r => r.trim() === a)) continue;
+                results.push(text);
+            }
+
+            // Fallback: si no alcanzamos el número pedido, rellenamos con lo que quede (incluso si repite)
+            if (results.length < needed) {
+                for (let i = 0; i < pool.length && results.length < needed; i++) {
+                    const text = (typeof transformFn === 'function') ? transformFn(pool[i]) : pool[i];
+                    if (!text) continue;
+                    if (!results.some(r => r.trim() === text.trim())) {
+                        results.push(text);
+                    }
+                }
+            }
+
+            return results;
+        }
+
+        // Devuelve una palabra/frase preferida tomada del inicio de la definición
+        function obtenerTerminoPreferido(definicion) {
+            if (!definicion || typeof definicion !== 'string') return '';
+            const palabras = definicion.split(/\s+/).filter(Boolean);
+            const stopwords = new Set(['de','del','la','el','una','un','los','las','en','por','para','con','al','a','su','sus','que']);
+            for (let i = 0; i < Math.min(6, palabras.length); i++) {
+                let w = palabras[i].replace(/^[.,;:\-\s]+|[.,;:\-\s]+$/g, '');
+                if (!w) continue;
+                if (!stopwords.has(w.toLowerCase())) {
+                    return w;
+                }
+            }
+            return '';
+        }
+
+        // Genera un fragmento más natural para el hueco cuando no se encuentra
+        // la ocurrencia literal del concepto en la definición.
+        function generarFragmentoHueco(definicionOriginal, preferredNoun) {
+            if (!definicionOriginal || typeof definicionOriginal !== 'string') return "La definición de: __________________ es " + (definicionOriginal || '');
+
+            const connectors = [
+                'cuando', 'en el que', 'en la que', 'el cual', 'la cual', 'cual',
+                'por el que', 'por la que', 'para que', 'donde', 'al que', 'al cual', 'momento en que', 'en que', 'que'
+            ];
+
+            const lower = definicionOriginal.toLowerCase();
+            let bestPos = -1;
+            let bestConn = '';
+
+            for (const conn of connectors) {
+                const idx = lower.indexOf(conn);
+                if (idx !== -1) {
+                    if (bestPos === -1 || idx < bestPos) {
+                        bestPos = idx;
+                        bestConn = conn;
+                    }
+                }
+            }
+
+            let fragment = '';
+            if (bestPos !== -1) {
+                fragment = definicionOriginal.slice(bestPos).trim();
+
+                // Si el fragmento comienza con una preposición/conector corto
+                // como 'en', 'por', 'para', es preferible incluir el segmento
+                // anterior para conservar la frase natural (p. ej. "Dificultad generada por la forma en que...")
+                if (/^(en|por|para|donde|al|con)\b/i.test(fragment)) {
+                    const before = definicionOriginal.slice(0, bestPos).trim();
+                    if (before) {
+                        fragment = (before + ' ' + fragment).trim();
+                    }
+                }
+            } else {
+                const palabras = definicionOriginal.split(/\s+/).filter(Boolean);
+                if (palabras.length > 0) {
+                    // intentar extraer una frase nominal del inicio
+                    const stopwordsStart = new Set(['de','del','la','el','una','un','los','las','en','por','para','con','al','a','su','sus','que','como','entre']);
+                    let nounIndex = -1;
+                    let nounCandidate = '';
+                    for (let i = 0; i < Math.min(6, palabras.length); i++) {
+                        const w = palabras[i].replace(/[.,;:]$/g, '');
+                        if (!stopwordsStart.has(w.toLowerCase())) {
+                            nounIndex = i;
+                            nounCandidate = w;
+                            break;
+                        }
+                    }
+
+                    // Preferir preferredNoun si fue provisto (viene de la flashcard)
+                    if (preferredNoun && String(preferredNoun).trim()) {
+                        nounCandidate = String(preferredNoun).trim();
+                        nounIndex = -1; // indicamos que usamos preferred
+                    }
+
+                    if (nounCandidate) {
+                        // construir fragment a partir de la palabra siguiente al nounIndex (si existe)
+                        let rest = '';
+                        if (nounIndex >= 0 && nounIndex + 1 < palabras.length) {
+                            rest = palabras.slice(nounIndex + 1).join(' ');
+                        } else if (palabras.length > 1) {
+                            rest = palabras.slice(1).join(' ');
+                        }
+                        fragment = (nounCandidate + (rest ? ' ' + rest : '')).trim();
+                    } else if (palabras.length > 3) {
+                        fragment = palabras.slice(3).join(' ');
+                    } else {
+                        return "La definición de: __________________ es " + definicionOriginal;
+                    }
+                } else {
+                    return "La definición de: __________________ es " + definicionOriginal;
+                }
+            }
+
+            // Mejoras lingüísticas: si empieza con 'cual' o 'el cual', usar 'cuando'
+            fragment = fragment.replace(/^((el|la)\s+)?cual\b/i, 'cuando');
+            fragment = fragment.replace(/^((el|la)\s+)?al\s+que\b/i, 'cuando');
+
+            // Si el fragmento comienza con un conector 'que...' es preferible anteponer
+            // un sustantivo o frase nominal tomada del segmento anterior para que la frase
+            // resultante tenga sentido (p. ej. 'elementos que el docente...')
+            if (/^que\b/i.test(fragment) && bestPos !== -1) {
+                const before = definicionOriginal.slice(0, bestPos).trim();
+                const words = before.split(/\s+/).filter(Boolean);
+                // Buscar las últimas 1-3 palabras que no sean preposiciones/artículos
+                const stopwords = new Set(['de','del','la','el','una','un','los','las','en','por','para','con','al','a','su','sus']);
+                const collected = [];
+                for (let i = words.length - 1; i >= 0 && collected.length < 3; i--) {
+                    const w = words[i].replace(/[.,;:]$/g, '');
+                    if (stopwords.has(w.toLowerCase())) continue;
+                    collected.push(w);
+                }
+                let nounCandidate = '';
+                if (collected.length > 0) {
+                    nounCandidate = collected.reverse().join(' ');
+                }
+                if (!nounCandidate) nounCandidate = 'elementos';
+                fragment = (nounCandidate + ' ' + fragment).trim();
+            }
+
+            // Limpiar signos iniciales que queden y normalizar la primera letra a minúscula
+            fragment = fragment.replace(/^[:,;\-\s]+/, '').trim();
+            if (fragment.length > 0) {
+                fragment = fragment.charAt(0).toLowerCase() + fragment.slice(1);
+            }
+
+            return '__________________ ' + fragment;
+        }
+
+        function extraerConceptoClave(anverso) {
+            let concepto = anverso
+                .replace("¿Qué es la ", "")
+                .replace("¿Qué es un ", "")
+                .replace("¿Qué es ", "")
+                .replace("¿Quién desarrolló la ", "")
+                .replace("¿Quién popularizó la ", "")
+                .replace("¿Cuál es la idea central de la ", "")
+                .replace("¿Qué papel tiene el ", "")
+                .replace("?", "")
+                .replace("¿", "");
+            
+            concepto = concepto.trim();
+
+            // Normalizar equivalencias: tratar 'TSD' como la forma larga
+            if (concepto.toUpperCase() === 'TSD') {
+                concepto = 'Teoría de las Situaciones Didácticas';
+            }
+
+            // Asegurar mayúscula inicial y retorno limpio
+            return concepto.charAt(0).toUpperCase() + concepto.slice(1).trim();
+        }
+
+        function renderJuegoPregunta() {
+            const pregunta = appState.juego.preguntas[appState.juego.currentIndex];
+            const numTotal = appState.juego.preguntas.length;
+            const currentNum = appState.juego.currentIndex + 1;
+
+            appState.juego.respondido = false;
+            appState.juego.respuestaSeleccionada = null;
+
+            document.getElementById("juegoEnunciado").textContent = pregunta.enunciado;
+            document.getElementById("juegoInstruccion").textContent = pregunta.instruccion;
+            document.getElementById("juegoProgresoTexto").textContent = `${currentNum} / ${numTotal}`;
+            
+            const porcentaje = (currentNum / numTotal) * 100;
+            document.getElementById("juegoBarraProgreso").style.width = `${porcentaje}%`;
+
+            const badge = document.getElementById("badgeTipoPregunta");
+            const tiposTexto = ["Opción Múltiple", "Verdadero o Falso", "Asociar Concepto", "Completar Definición"];
+            badge.textContent = tiposTexto[pregunta.tipo];
+            
+            const container = document.getElementById("juegoZonaRespuestas");
+            container.innerHTML = "";
+
+            pregunta.opciones.forEach((opcion, index) => {
+                const btn = document.createElement("button");
+                btn.className = "opcion-juego w-full text-left p-4 bg-white border border-slate-200 hover:border-academic-400 hover:bg-academic-50/50 rounded-xl font-medium transition flex items-start gap-3 shadow-sm";
+                btn.id = `opcionBtn_${index}`;
+                btn.onclick = () => seleccionarOpcion(index);
+                
+                const letras = ["A", "B", "C", "D"];
+                const letra = letras[index] || "•";
+
+                btn.innerHTML = `
+                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-100 text-slate-600 font-bold text-sm shrink-0 border border-slate-200" id="letraBadge_${index}">
+                        ${letra}
+                    </span>
+                    <span class="text-slate-700 leading-snug">${opcion.texto}</span>
+                `;
+                container.appendChild(btn);
+            });
+
+            const btnResp = document.getElementById("btnResponder");
+            btnResp.textContent = "Comprobar Respuesta";
+            btnResp.disabled = true;
+            btnResp.className = "px-6 py-3 bg-slate-300 text-slate-500 rounded-xl font-bold shadow-sm transition cursor-not-allowed";
+        }
+
+        function seleccionarOpcion(index) {
+            if (appState.juego.respondido) return;
+
+            const pregunta = appState.juego.preguntas[appState.juego.currentIndex];
+            appState.juego.respuestaSeleccionada = index;
+
+            pregunta.opciones.forEach((_, idx) => {
+                const btn = document.getElementById(`opcionBtn_${idx}`);
+                const badge = document.getElementById(`letraBadge_${idx}`);
+                
+                if (idx === index) {
+                    btn.className = "opcion-juego w-full text-left p-4 bg-academic-50 border-2 border-academic-500 rounded-xl font-medium transition flex items-start gap-3 shadow-md";
+                    badge.className = "inline-flex items-center justify-center w-7 h-7 rounded-lg bg-academic-600 text-white font-bold text-sm shrink-0";
+                } else {
+                    btn.className = "opcion-juego w-full text-left p-4 bg-white border border-slate-200 hover:border-academic-400 hover:bg-academic-50/50 rounded-xl font-medium transition flex items-start gap-3 shadow-sm";
+                    badge.className = "inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-100 text-slate-600 font-bold text-sm shrink-0 border border-slate-200";
+                }
+            });
+
+            const btnResp = document.getElementById("btnResponder");
+            btnResp.disabled = false;
+            btnResp.className = "px-6 py-3 bg-academic-600 hover:bg-academic-700 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition cursor-pointer";
+        }
+
+        function verificarRespuesta() {
+            if (appState.juego.respondido) {
+                avanzarPreguntaJuego();
+                return;
+            }
+
+            const pregunta = appState.juego.preguntas[appState.juego.currentIndex];
+            const seleccion = appState.juego.respuestaSeleccionada;
+            
+            if (seleccion === null) return;
+
+            appState.juego.respondido = true;
+            const opcionElegida = pregunta.opciones[seleccion];
+            const esCorrecto = opcionElegida.correcto;
+
+            if (esCorrecto) {
+                appState.juego.aciertos++;
+                document.getElementById("juegoAciertosSpan").textContent = appState.juego.aciertos;
+                soundController.playSuccess();
+            } else {
+                appState.juego.errores++;
+                document.getElementById("juegoErroresSpan").textContent = appState.juego.errores;
+                soundController.playError();
+            }
+
+            pregunta.opciones.forEach((opc, idx) => {
+                const btn = document.getElementById(`opcionBtn_${idx}`);
+                const badge = document.getElementById(`letraBadge_${idx}`);
+
+                if (opc.correcto) {
+                    btn.className = "opcion-juego w-full text-left p-4 bg-emerald-50 border-2 border-success rounded-xl font-medium transition flex items-start gap-3 shadow-md";
+                    badge.className = "inline-flex items-center justify-center w-7 h-7 rounded-lg bg-success text-white font-bold text-sm shrink-0";
+                } else if (idx === seleccion) {
+                    btn.className = "opcion-juego w-full text-left p-4 bg-red-50 border-2 border-error rounded-xl font-medium transition flex items-start gap-3 shadow-md";
+                    badge.className = "inline-flex items-center justify-center w-7 h-7 rounded-lg bg-error text-white font-bold text-sm shrink-0";
+                } else {
+                    btn.className = "opcion-juego w-full text-left p-4 bg-slate-50 border border-slate-200 rounded-xl font-medium opacity-50 flex items-start gap-3 shrink-0";
+                }
+            });
+
+            const btnResp = document.getElementById("btnResponder");
+            const esUltima = (appState.juego.currentIndex === appState.juego.preguntas.length - 1);
+            btnResp.textContent = esUltima ? "Finalizar Examen" : "Siguiente Pregunta";
+            btnResp.className = "px-6 py-3 bg-success hover:bg-emerald-600 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition cursor-pointer";
+        }
+
+        function avanzarPreguntaJuego() {
+            if (appState.juego.currentIndex < appState.juego.preguntas.length - 1) {
+                appState.juego.currentIndex++;
+                renderJuegoPregunta();
+            } else {
+                finalizarJuego();
+            }
+        }
+
+        function finalizarJuego() {
+            if (appState.juego.timerInterval) {
+                clearInterval(appState.juego.timerInterval);
+                appState.juego.timerInterval = null;
+            }
+
+            const notaFinal = Number((appState.juego.aciertos * 0.5).toFixed(1));
+
+            const mins = String(Math.floor(appState.juego.segundos / 60)).padStart(2, '0');
+            const secs = String(appState.juego.segundos % 60).padStart(2, '0');
+            const tiempoFormateado = `${mins}:${secs}`;
+
+            const nuevoRegistro = {
+                alumno: appState.juego.alumno,
+                idUsuario: appState.juego.idUsuario,
+                fecha: appState.juego.fecha,
+                hora: appState.juego.hora,
+                tiempo: tiempoFormateado,
+                segundos: appState.juego.segundos,
+                aciertos: appState.juego.aciertos,
+                errores: appState.juego.errores,
+                nota: notaFinal
+            };
+
+            guardarHistorialPartida(nuevoRegistro);
+
+            document.getElementById("resAlumno").textContent = nuevoRegistro.alumno;
+            document.getElementById("resFecha").textContent = `${nuevoRegistro.fecha} - ${nuevoRegistro.hora}`;
+            document.getElementById("resNota").textContent = notaFinal.toFixed(1);
+            document.getElementById("resAciertos").textContent = nuevoRegistro.aciertos;
+            document.getElementById("resErrores").textContent = nuevoRegistro.errores;
+            document.getElementById("resTiempo").textContent = tiempoFormateado;
+
+            const feedbackElem = document.getElementById("resFeedbackTexto");
+            if (notaFinal >= 9.0) {
+                feedbackElem.textContent = "¡Sobresaliente! Comprendes las bases estructurales de la Teoría de las Situaciones Didácticas.";
+            } else if (notaFinal >= 7.0) {
+                feedbackElem.textContent = "¡Buen trabajo! Tienes bases sólidas del aula de Brousseau. Sigue repasando para dominar las fases de validación.";
+            } else if (notaFinal >= 6.0) {
+                feedbackElem.textContent = "Aprobado. Conoces los conceptos más generales, te invitamos a repasar un poco más en el Modo Estudio.";
+            } else {
+                feedbackElem.textContent = "Recuerda que en la Teoría de las Situaciones Didácticas, el error no es malo, es un indicador del camino intelectual. ¡Vuelve a estudiar y supera tu récord!";
+            }
+
+            showSection('secJuegoResultados');
+        }
+
+        // ==========================================
+        // LÓGICA DE CONTROL: PERSISTENCIA LOCAL
+        // ==========================================
+        const LOCAL_STORAGE_KEY = "TSD_Flashcards_Historial_Partidas_v2.5";
+
+        function getHistorial() {
+            const data = localStorage.getItem(LOCAL_STORAGE_KEY);
+            return data ? JSON.parse(data) : [];
+        }
+
+        function guardarHistorialPartida(registro) {
+            let historial = getHistorial();
+            historial.push(registro);
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(historial));
+        }
+
+        function actualizarLiderEstadisticas() {
+            const historial = getHistorial();
+            const liderSpan = document.getElementById("liderSpan");
+            
+            if (historial.length === 0) {
+                liderSpan.textContent = "Registra partidas en el Modo Juego para activar el podio de estudiantes.";
+                return;
+            }
+
+            let ordenados = [...historial].sort((a, b) => {
+                if (b.nota !== a.nota) return b.nota - a.nota;
+                return a.segundos - b.segundos;
+            });
+
+            const lider = ordenados[0];
+            liderSpan.innerHTML = `Líder actual del aula: <strong class="text-amber-900">${lider.alumno}</strong> con nota perfecta de <strong class="text-amber-900">${lider.nota.toFixed(1)}</strong> en un tiempo de <strong class="text-amber-900">${lider.tiempo} min</strong>.`;
+        }
+
+        // ==========================================
+        // LÓGICA DE CONTROL: PANEL PROFESOR
+        // ==========================================
+        const CLAVE_PROFESOR = "profesorTSD2026";
+
+        function openAuthProfesor() {
+            document.getElementById("inputProfesorPass").value = "";
+            document.getElementById("authErrorMsg").classList.add('hidden');
+            showSection('secProfesorAuth');
+        }
+
+        function verificarProfesorAuth() {
+            const val = document.getElementById("inputProfesorPass").value;
+            const errorMsg = document.getElementById("authErrorMsg");
+            
+            if (val === CLAVE_PROFESOR) {
+                errorMsg.classList.add('hidden');
+                cargarProfesorDashboard();
+                showSection('secProfesorDashboard');
+            } else {
+                errorMsg.classList.remove('hidden');
+            }
+        }
+
+        function cerrarSesionProfesor() {
+            goToMenu();
+        }
+
+        function cargarProfesorDashboard() {
+            const historial = getHistorial();
+            const totalIntentos = historial.length;
+            document.getElementById("statIntentos").textContent = totalIntentos;
+
+            if (totalIntentos === 0) {
+                document.getElementById("statPromedio").textContent = "0.0";
+                document.getElementById("statMejorNota").textContent = "0.0";
+                document.getElementById("statMejorTiempo").textContent = "--:--";
+                
+                document.getElementById("noDataMsg").classList.remove('hidden');
+                document.getElementById("historialTableBody").innerHTML = "";
+                document.getElementById("top10Container").innerHTML = `
+                    <div class="text-center py-6 text-slate-400 text-sm">No hay datos en el ranking todavía.</div>
+                `;
+                document.getElementById("graficoDistribucion").innerHTML = `
+                    <div class="w-full text-center py-10 text-slate-400 text-sm italic">Distribución vacía</div>
+                `;
+                return;
+            }
+
+            document.getElementById("noDataMsg").classList.add('hidden');
+
+            const sumaNotas = historial.reduce((acc, r) => acc + r.nota, 0);
+            const promedio = Number((sumaNotas / totalIntentos).toFixed(2));
+            document.getElementById("statPromedio").textContent = promedio.toFixed(1);
+
+            const maxNota = Math.max(...historial.map(r => r.nota));
+            document.getElementById("statMejorNota").textContent = maxNota.toFixed(1);
+
+            let minSegundos = Math.min(...historial.map(r => r.segundos));
+            const minMin = String(Math.floor(minSegundos / 60)).padStart(2, '0');
+            const minSec = String(minSegundos % 60).padStart(2, '0');
+            document.getElementById("statMejorTiempo").textContent = `${minMin}:${minSec}`;
+
+            // Ranking Top 10
+            let topEstudiantes = [...historial].sort((a, b) => {
+                if (b.nota !== a.nota) return b.nota - a.nota;
+                return a.segundos - b.segundos;
+            }).slice(0, 10);
+
+            const top10Container = document.getElementById("top10Container");
+            top10Container.innerHTML = "";
+
+            topEstudiantes.forEach((est, index) => {
+                let badgeStyle = "bg-slate-100 text-slate-700";
+                let textWeight = "font-medium";
+                if (index === 0) {
+                    badgeStyle = "bg-amber-100 text-amber-800 border border-amber-200";
+                    textWeight = "font-bold text-slate-900";
+                } else if (index === 1) {
+                    badgeStyle = "bg-slate-200 text-slate-800";
+                } else if (index === 2) {
+                    badgeStyle = "bg-orange-50 text-orange-800";
+                }
+
+                const div = document.createElement("div");
+                div.className = "flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100";
+                div.innerHTML = `
+                    <div class="flex items-center space-x-3 truncate">
+                        <span class="w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs ${badgeStyle}">
+                            ${index + 1}
+                        </span>
+                        <div class="truncate">
+                            <span class="${textWeight} text-sm block truncate">${est.alumno}</span>
+                            <span class="text-[10px] text-slate-400 font-mono">${est.fecha} • ${est.tiempo} min</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-sm font-black text-academic-700">${est.nota.toFixed(1)}</span>
+                        <span class="text-[9px] text-slate-400 block">pts</span>
+                    </div>
+                `;
+                top10Container.appendChild(div);
+            });
+
+            // Distribución de Notas
+            let rangosCount = [0, 0, 0, 0];
+            historial.forEach(r => {
+                if (r.nota < 6.0) rangosCount[0]++;
+                else if (r.nota < 8.0) rangosCount[1]++;
+                else if (r.nota < 10.0) rangosCount[2]++;
+                else rangosCount[3]++;
+            });
+
+            const maxCount = Math.max(...rangosCount, 1);
+            const coloresBarras = [
+                "from-red-400 to-red-500",
+                "from-amber-400 to-amber-500",
+                "from-blue-400 to-blue-500",
+                "from-emerald-400 to-emerald-500"
+            ];
+
+            const graficoDistribucion = document.getElementById("graficoDistribucion");
+            graficoDistribucion.innerHTML = "";
+
+            rangosCount.forEach((count, i) => {
+                const pctHeight = (count / maxCount) * 100;
+                const barCol = document.createElement("div");
+                barCol.className = "flex-1 flex flex-col items-center justify-end h-full";
+                barCol.innerHTML = `
+                    <span class="text-xs font-bold text-slate-700 mb-1">${count}</span>
+                    <div class="w-full bg-gradient-to-t ${coloresBarras[i]} rounded-t-lg transition-all duration-700 shadow-sm" style="height: ${pctHeight === 0 ? '4px' : pctHeight + '%'}"></div>
+                `;
+                graficoDistribucion.appendChild(barCol);
+            });
+
+            renderTablaHistorial(historial);
+        }
+
+        function renderTablaHistorial(datos) {
+            const tableBody = document.getElementById("historialTableBody");
+            tableBody.innerHTML = "";
+
+            datos.forEach(reg => {
+                const tr = document.createElement("tr");
+                tr.className = "hover:bg-slate-50 transition";
+                
+                let notaBadge = "bg-slate-100 text-slate-700";
+                if (reg.nota >= 9.0) notaBadge = "bg-emerald-100 text-emerald-800";
+                else if (reg.nota >= 7.0) notaBadge = "bg-blue-100 text-blue-800";
+                else if (reg.nota < 6.0) notaBadge = "bg-red-100 text-red-800";
+
+                tr.innerHTML = `
+                    <td class="p-4 font-bold text-slate-800">${reg.alumno}</td>
+                    <td class="p-4 text-slate-500 font-mono text-xs">${reg.idUsuario}</td>
+                    <td class="p-4 text-slate-500 text-xs">${reg.fecha} <span class="text-slate-400">${reg.hora}</span></td>
+                    <td class="p-4 text-slate-600 font-mono text-xs">${reg.tiempo}</td>
+                    <td class="p-4 text-center font-semibold text-emerald-600">${reg.aciertos}</td>
+                    <td class="p-4 text-center font-semibold text-red-500">${reg.errores}</td>
+                    <td class="p-4 text-right">
+                        <span class="px-2.5 py-1 rounded-full text-xs font-black ${notaBadge}">
+                            ${reg.nota.toFixed(1)}
+                        </span>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        function filtrarHistorial() {
+            const query = document.getElementById("tablaFiltroInput").value.toLowerCase();
+            const historial = getHistorial();
+            const filtrados = historial.filter(r => r.alumno.toLowerCase().includes(query));
+            renderTablaHistorial(filtrados);
+        }
+
+        function mostrarConfirmacionBorrar() {
+            document.getElementById("modalConfirmarBorrar").classList.remove('hidden');
+        }
+
+        function ocultarConfirmacionBorrar() {
+            document.getElementById("modalConfirmarBorrar").classList.add('hidden');
+        }
+
+        function borrarHistorialTotal() {
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+            ocultarConfirmacionBorrar();
+            cargarProfesorDashboard();
+        }
+
+        // ==========================================
+        // EXPORTACIÓN DE REPORTE CSV PARA EXCEL
+        // ==========================================
+        function exportarCSV() {
+            const historial = getHistorial();
+            if (historial.length === 0) {
+                alert("No hay registros disponibles para exportar.");
+                return;
+            }
+
+            let contenidoCsv = "\uFEFF"; // BOM para codificación UTF-8 en Excel
+            contenidoCsv += "Alumno,ID Usuario,Fecha,Hora,Tiempo,Aciertos,Errores,Nota\n";
+
+            historial.forEach(r => {
+                const alumnoLimpio = `"${r.alumno.replace(/"/g, '""')}"`;
+                contenidoCsv += `${alumnoLimpio},${r.idUsuario},${r.fecha},${r.hora},${r.tiempo},${r.aciertos},${r.errores},${r.nota.toFixed(1)}\n`;
+            });
+
+            const blob = new Blob([contenidoCsv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const fechaHoy = new Date().toISOString().slice(0, 10);
+            const nombreArchivo = `Reporte_TSD_Evaluacion_${fechaHoy}.csv`;
+
+            if (navigator.msSaveBlob) {
+                navigator.msSaveBlob(blob, nombreArchivo);
+            } else {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", nombreArchivo);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+    </script>
+</body>
+</html>
