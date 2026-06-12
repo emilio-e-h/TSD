@@ -115,7 +115,7 @@
                     <strong class="text-sm md:text-base">Presentación - Teoría de las Situaciones Didácticas</strong>
                 </div>
                 <div class="flex items-center gap-2">
-                    <a id="presentacionDownload" href="PDF/TSD.PDF" download target="_blank" class="px-3 py-1 rounded-md bg-academic-600 text-white text-xs md:text-sm hover:bg-academic-700">Descargar</a>
+                    <a id="presentacionDownload" href="pdf/TSD.pdf" download target="_blank" class="px-3 py-1 rounded-md bg-academic-600 text-white text-xs md:text-sm hover:bg-academic-700">Descargar</a>
                     <button onclick="closePresentation()" class="px-3 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-xs md:text-sm">Cerrar</button>
                 </div>
             </div>
@@ -941,7 +941,7 @@
             const iframe = document.getElementById('presentacionFrame');
             const dl = document.getElementById('presentacionDownload');
             // Establecer rutas relativas
-            const pdfPath = 'PDF/TSD.PDF';
+            const pdfPath = 'pdf/TSD.pdf';
             iframe.src = pdfPath;
             dl.href = pdfPath;
             modal.classList.remove('hidden');
