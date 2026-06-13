@@ -30,6 +30,9 @@
         }
     </script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Firebase (compat) para integración opcional: Firestore -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
     <!-- ========================================== -->
     <!-- ESTILOS (Equivalente a styles.css)         -->
@@ -565,6 +568,11 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
                     <input id="remoteEndpointInput" type="text" placeholder="Endpoint (URL) para recibir registros" class="col-span-2 p-2 border border-slate-200 rounded-lg text-sm" />
                     <input id="remoteTokenInput" type="text" placeholder="Token (opcional)" class="p-2 border border-slate-200 rounded-lg text-sm" />
+                    <div class="col-span-3 mt-2">
+                        <label class="text-sm font-semibold">Usar Firebase (opcional)</label>
+                        <div class="text-xs text-slate-500">Si quieres guardar y sincronizar registros en Firestore, pega aquí el objeto de configuración web de Firebase (JSON). Ej: {"apiKey":..., "authDomain":..., "projectId":..., "storageBucket":..., "messagingSenderId":..., "appId":...}</div>
+                        <textarea id="firebaseConfigTextarea" class="w-full mt-2 p-2 border border-slate-200 rounded-lg text-sm h-28" placeholder='Pega aquí el JSON de configuración de Firebase (opcional)'></textarea>
+                    </div>
                     <div class="col-span-3 flex items-center gap-3">
                         <button id="saveRemoteConfigBtn" onclick="saveRemoteConfig()" class="px-3 py-2 bg-academic-600 text-white rounded-lg text-sm">Guardar</button>
                         <button onclick="clearRemoteConfig()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm">Limpiar</button>
@@ -996,6 +1004,15 @@
                     document.getElementById('remoteEndpointInput') && (document.getElementById('remoteEndpointInput').value = cfg.endpoint || '');
                     document.getElementById('remoteTokenInput') && (document.getElementById('remoteTokenInput').value = cfg.token || '');
                     document.getElementById('remoteConfigStatus') && (document.getElementById('remoteConfigStatus').textContent = cfg.endpoint ? 'Endpoint configurado' : 'Sin endpoint');
+                    if (cfg.firebase) {
+                        const ta = document.getElementById('firebaseConfigTextarea');
+                        try { ta && (ta.value = JSON.stringify(cfg.firebase, null, 2)); } catch(e){}
+                        // Intentar inicializar Firebase y arrancar polling
+                        try { if (initFirebaseIfConfigured(cfg)) { startRemotePolling(); document.getElementById('remoteConfigStatus').textContent = 'Firebase activo'; } } catch(e) {}
+                    } else {
+                        // arrancar polling si existe endpoint
+                        try { if (cfg.endpoint) startRemotePolling(); } catch(e) {}
+                    }
                 }
             } catch (e) {}
             
@@ -1025,13 +1042,30 @@
         function saveRemoteConfig() {
             const endpoint = document.getElementById('remoteEndpointInput').value.trim();
             const token = document.getElementById('remoteTokenInput').value.trim();
-            if (!endpoint) {
-                document.getElementById('remoteConfigStatus').textContent = 'Introduce una URL válida.';
+            const firebaseText = (document.getElementById('firebaseConfigTextarea') && document.getElementById('firebaseConfigTextarea').value.trim()) || '';
+            if (!endpoint && !firebaseText) {
+                document.getElementById('remoteConfigStatus').textContent = 'Introduce una URL válida o pega la configuración de Firebase.';
                 return;
             }
             const cfg = { endpoint: endpoint, token: token };
+            if (firebaseText) {
+                try {
+                    const parsed = JSON.parse(firebaseText);
+                    cfg.firebase = parsed;
+                } catch (e) {
+                    document.getElementById('remoteConfigStatus').textContent = 'JSON de Firebase inválido.';
+                    return;
+                }
+            }
             if (saveRemoteConfigToStorage(cfg)) {
                 document.getElementById('remoteConfigStatus').textContent = 'Configuración guardada.';
+                // Intentar inicializar Firebase si se proporcionó configuración
+                if (cfg.firebase) {
+                    try { initFirebaseIfConfigured(cfg); document.getElementById('remoteConfigStatus').textContent = 'Configuración guardada. Firebase inicializado.'; startRemotePolling(); } catch (e) { document.getElementById('remoteConfigStatus').textContent = 'Configuración guardada, fallo al inicializar Firebase.'; }
+                } else {
+                    // Si hay endpoint HTTP, iniciar polling normal
+                    if (cfg.endpoint) startRemotePolling();
+                }
             } else {
                 document.getElementById('remoteConfigStatus').textContent = 'Error guardando la configuración.';
             }
@@ -1676,6 +1710,9 @@
         // ==========================================
         const LOCAL_STORAGE_KEY = "TSD_Flashcards_Historial_Partidas_v2.5";
         const REMOTE_CONFIG_KEY = "TSD_Remote_Config_v1";
+        // Polling remoto (traer intentos desde otras laptops)
+        let remotePollTimer = null;
+        const REMOTE_POLL_INTERVAL_MS = 10000; // 10 segundos
 
         // Carga la configuración remota (endpoint + token) desde localStorage
         function loadRemoteConfig() {
@@ -1685,6 +1722,25 @@
                 return JSON.parse(raw);
             } catch (e) {
                 return null;
+            }
+        }
+
+        // Firebase runtime state
+        let firebaseInitialized = false;
+        let firebaseDb = null;
+
+        function initFirebaseIfConfigured(cfg) {
+            try {
+                if (firebaseInitialized) return true;
+                if (!cfg || !cfg.firebase) return false;
+                // cfg.firebase debe ser el objeto de configuración web
+                firebase.initializeApp(cfg.firebase);
+                firebaseDb = firebase.firestore();
+                firebaseInitialized = true;
+                return true;
+            } catch (e) {
+                console.warn('Error inicializando Firebase:', e);
+                return false;
             }
         }
 
@@ -1701,7 +1757,10 @@
             localStorage.removeItem(REMOTE_CONFIG_KEY);
             document.getElementById('remoteEndpointInput').value = '';
             document.getElementById('remoteTokenInput').value = '';
+            const ta = document.getElementById('firebaseConfigTextarea');
+            if (ta) ta.value = '';
             document.getElementById('remoteConfigStatus').textContent = 'Configuración eliminada.';
+            try { stopRemotePolling(); } catch (e) {}
         }
 
         function getHistorial() {
@@ -1714,12 +1773,22 @@
             historial.push(registro);
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(historial));
 
-            // Intentar envío remoto (no bloqueante)
+            // Actualizar interfaz localmente: podio y panel docente
+            try {
+                actualizarLiderEstadisticas();
+                if (appState.currentSection === 'secProfesorDashboard') {
+                    cargarProfesorDashboard();
+                }
+            } catch (e) { console.warn('Error actualizando UI tras guardar registro:', e); }
+
+            // Intentar envío remoto (no bloqueante). Soporta endpoint HTTP o Firebase
             const cfg = loadRemoteConfig();
-            if (cfg && cfg.endpoint) {
+            if (cfg && (cfg.endpoint || cfg.firebase)) {
                 enviarRegistroServidor(registro, cfg).then(r => {
                     console.log('Registro enviado remoto:', r);
                     document.getElementById('remoteConfigStatus') && (document.getElementById('remoteConfigStatus').textContent = 'Último envío: OK');
+                    // Cuando el servidor confirme, opcionalmente forzamos recarga del dashboard
+                    try { if (appState.currentSection === 'secProfesorDashboard') cargarProfesorDashboard(); } catch(e){}
                 }).catch(err => {
                     console.warn('Error envío remoto:', err);
                     document.getElementById('remoteConfigStatus') && (document.getElementById('remoteConfigStatus').textContent = 'Último envío: fallo');
@@ -1727,10 +1796,111 @@
             }
         }
 
+        // Fusiona registros remotos en el historial local evitando duplicados
+        function mergeRemoteRecords(remoteRecords) {
+            if (!Array.isArray(remoteRecords) || remoteRecords.length === 0) return 0;
+            const existing = getHistorial();
+            const existingKeys = new Set(existing.map(r => `${r.idUsuario}||${r.fecha}||${r.hora}||${r.nota}`));
+            let added = 0;
+            remoteRecords.forEach(r => {
+                try {
+                    const key = `${r.idUsuario}||${r.fecha}||${r.hora}||${r.nota}`;
+                    if (!existingKeys.has(key)) {
+                        existing.push(r);
+                        existingKeys.add(key);
+                        added++;
+                    }
+                } catch (e) { /* ignore malformed record */ }
+            });
+            if (added > 0) {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(existing));
+                try { actualizarLiderEstadisticas(); } catch (e) {}
+                try { if (appState.currentSection === 'secProfesorDashboard') cargarProfesorDashboard(); } catch (e) {}
+            }
+            return added;
+        }
+
+        // Realiza una consulta GET al endpoint remoto para recuperar intentos recientes
+        function pollRemoteRecordsOnce() {
+            const cfg = loadRemoteConfig();
+            if (!cfg || !cfg.endpoint) return Promise.resolve({ ok: false, reason: 'no-cfg' });
+            // Si está configurado Firebase, leer desde Firestore
+            return new Promise((resolve) => {
+                try {
+                    if (cfg.firebase) {
+                        if (!initFirebaseIfConfigured(cfg)) return resolve({ ok: false, reason: 'firebase-init-fail' });
+                        firebaseDb.collection('registros').orderBy('createdAt', 'desc').get().then(snapshot => {
+                            const arr = [];
+                            snapshot.forEach(doc => {
+                                const d = doc.data();
+                                // Normalizar estructura esperada
+                                arr.push({ alumno: d.alumno, idUsuario: d.idUsuario, fecha: d.fecha, hora: d.hora, tiempo: d.tiempo, segundos: d.segundos, aciertos: d.aciertos, errores: d.errores, nota: d.nota });
+                            });
+                            const added = mergeRemoteRecords(arr);
+                            resolve({ ok: true, added: added });
+                        }).catch(err => resolve({ ok: false, reason: 'firestore-get' }));
+                        return;
+                    }
+
+                    const headers = {};
+                    if (cfg.token) headers['X-Auth-Token'] = cfg.token;
+                    fetch(cfg.endpoint, { method: 'GET', mode: 'cors', headers: headers }).then(resp => {
+                        if (!resp.ok) return resp.text().then(t => resolve({ ok: false, reason: 'http:' + resp.status + ' ' + t }));
+                        return resp.json().then(data => {
+                            if (!Array.isArray(data)) return resolve({ ok: false, reason: 'invalid-json' });
+                            const added = mergeRemoteRecords(data);
+                            resolve({ ok: true, added: added });
+                        }).catch(err => resolve({ ok: false, reason: 'json-error' }));
+                    }).catch(err => resolve({ ok: false, reason: 'fetch-error' }));
+                } catch (e) { resolve({ ok: false, reason: e.message }); }
+            });
+        }
+
+        function startRemotePolling() {
+            stopRemotePolling();
+            const cfg = loadRemoteConfig();
+            if (!cfg || !cfg.endpoint) return;
+            // Ejecutar inmediatamente y luego programar
+            pollRemoteRecordsOnce().then(res => {
+                if (res && res.ok) {
+                    document.getElementById('remoteConfigStatus') && (document.getElementById('remoteConfigStatus').textContent = `Sincronizado (+${res.added})`);
+                }
+            });
+            remotePollTimer = setInterval(() => {
+                pollRemoteRecordsOnce().then(res => {
+                    if (res && res.ok) {
+                        document.getElementById('remoteConfigStatus') && (document.getElementById('remoteConfigStatus').textContent = `Sincronizado (+${res.added})`);
+                    }
+                });
+            }, REMOTE_POLL_INTERVAL_MS);
+        }
+
+        function stopRemotePolling() {
+            if (remotePollTimer) {
+                clearInterval(remotePollTimer);
+                remotePollTimer = null;
+            }
+        }
+
         // Envía el registro al endpoint remoto configurado (POST JSON)
         function enviarRegistroServidor(registro, cfg) {
             return new Promise(function(resolve, reject) {
                 try {
+                    // Si se configuró Firebase, escribir en Firestore
+                    if (cfg && cfg.firebase) {
+                        if (!initFirebaseIfConfigured(cfg)) return reject('Firebase init failed');
+                        // Añadir campo creadoAt
+                        const doc = Object.assign({}, registro);
+                        try {
+                            doc.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                        } catch(e) { /* ignore */ }
+                        firebaseDb.collection('registros').add(doc).then(ref => {
+                            resolve({ ok: true, id: ref.id });
+                        }).catch(err => reject(err));
+                        return;
+                    }
+
+                    // Si no hay Firebase, usar POST al endpoint HTTP tradicional
                     const endpoint = cfg.endpoint;
                     const token = cfg.token || '';
                     if (!endpoint) return reject('No endpoint configurado');
@@ -1794,6 +1964,8 @@
         }
 
         function cerrarSesionProfesor() {
+            // Detener cualquier sondeo remoto activo cuando el profesor cierre sesión
+            try { stopRemotePolling(); } catch (e) {}
             goToMenu();
         }
 
@@ -1905,6 +2077,8 @@
             });
 
             renderTablaHistorial(historial);
+            // Iniciar sondeo remoto para traer registros desde otras laptops (si está configurado)
+            try { startRemotePolling(); } catch (e) { console.warn('No se pudo iniciar polling remoto:', e); }
         }
 
         function renderTablaHistorial(datos) {
