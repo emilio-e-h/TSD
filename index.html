@@ -576,6 +576,7 @@
                     <div class="col-span-3 flex items-center gap-3">
                         <button id="saveRemoteConfigBtn" onclick="saveRemoteConfig()" class="px-3 py-2 bg-academic-600 text-white rounded-lg text-sm">Guardar</button>
                         <button id="testFirebaseBtn" onclick="testFirebaseConnection()" class="px-3 py-2 bg-sky-600 text-white rounded-lg text-sm">Probar conexión Firebase</button>
+                        <button id="forceSyncBtn" onclick="forceSyncRemote()" class="px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm">Forzar sincronización</button>
                         <button onclick="clearRemoteConfig()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm">Limpiar</button>
                         <span id="remoteConfigStatus" class="text-sm text-slate-500"></span>
                     </div>
@@ -1783,6 +1784,26 @@
             }).catch(err => {
                 console.error('Error escribiendo doc de prueba:', err);
                 document.getElementById('remoteConfigStatus').textContent = 'Error escribiendo en Firestore: ' + (err && err.message ? err.message : String(err));
+            });
+        }
+
+        // Forzar sincronización inmediata desde el endpoint o Firestore
+        function forceSyncRemote() {
+            const cfg = loadRemoteConfig();
+            if (!cfg || (!cfg.endpoint && !cfg.firebase)) {
+                document.getElementById('remoteConfigStatus').textContent = 'No hay endpoint ni Firebase configurado.';
+                return;
+            }
+            document.getElementById('remoteConfigStatus').textContent = 'Sincronizando...';
+            pollRemoteRecordsOnce().then(res => {
+                if (res && res.ok) {
+                    document.getElementById('remoteConfigStatus').textContent = `Sincronizado correctamente. Registros añadidos: ${res.added}`;
+                } else {
+                    document.getElementById('remoteConfigStatus').textContent = `Error sincronizando: ${res && res.reason ? res.reason : 'desconocido'}`;
+                }
+            }).catch(err => {
+                console.warn('Error en sincronización forzada:', err);
+                document.getElementById('remoteConfigStatus').textContent = 'Error en sincronización: ' + (err && err.message ? err.message : String(err));
             });
         }
 
