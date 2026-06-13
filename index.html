@@ -1415,6 +1415,16 @@
                 fragment = fragment.charAt(0).toLowerCase() + fragment.slice(1);
             }
 
+            // Evitar palabras repetidas consecutivas (p. ej. "alumno alumno")
+            // Reemplaza ocurrencias donde una palabra se repite inmediatamente: "X X" -> "X"
+            try {
+                fragment = fragment.replace(/\b([^\s]+)\s+\1\b/gi, '$1');
+                // Normalizar espacios sobrantes
+                fragment = fragment.replace(/\s{2,}/g, ' ').trim();
+            } catch (e) {
+                // Si por alguna razón la regex falla, seguimos con el fragment original
+            }
+
             return '__________________ ' + fragment;
         }
 
