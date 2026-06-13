@@ -7,7 +7,6 @@
     
     <!-- ========================================== -->
     <!-- RECURSOS EXTERNOS (Tailwind & Lucide)      -->
-    <!-- ========================================== -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -813,7 +812,7 @@
             {
                 id: 19,
                 anverso: "¿Quién popularizó la Transposición Didáctica?",
-                reverso: "Yves Chevallard (1946-2026)."
+                reverso: "Yves Chevallard (1946-2026) en 1985."
             },
             {
                 id: 20,
@@ -1154,6 +1153,35 @@
             });
         }
 
+        // Sincroniza las preguntas en memoria con la versión actual de FLASHCARDS_DB.
+        // Esto corrige textos (reversos/enunciados/opciones) si la base fue actualizada
+        // después de que una partida ya estuviera generada (ej. corregir 'Yves Chevallard' añadiendo el año).
+        function syncPreguntasWithDB() {
+            if (!appState.juego || !Array.isArray(appState.juego.preguntas) || appState.juego.preguntas.length === 0) return;
+            appState.juego.preguntas = appState.juego.preguntas.map(p => {
+                try {
+                    const card = FLASHCARDS_DB.find(c => c.id === p.idFlashcard);
+                    if (!card) return p;
+                    const regenerated = construirPreguntaSegunTipo(card, p.tipo, FLASHCARDS_DB);
+                    // preservar estado de respuesta del jugador
+                    const kept = {
+                        respuestaSeleccionada: p.respuestaSeleccionada ?? null,
+                        respondido: p.respondido ?? false
+                    };
+                    return Object.assign({}, p, {
+                        enunciado: regenerated.enunciado,
+                        instruccion: regenerated.instruccion,
+                        opciones: regenerated.opciones,
+                        feedbackCorrecto: card.reverso,
+                        respuestaSeleccionada: kept.respuestaSeleccionada,
+                        respondido: kept.respondido
+                    });
+                } catch (e) {
+                    return p;
+                }
+            });
+        }
+
         function construirPreguntaSegunTipo(cardTarget, tipo, todasLasCards) {
             let pregunta = {
                 idFlashcard: cardTarget.id,
@@ -1414,6 +1442,8 @@
         }
 
         function renderJuegoPregunta() {
+            // Asegurar que las preguntas reflejen la versión actual de la base de datos
+            syncPreguntasWithDB();
             const pregunta = appState.juego.preguntas[appState.juego.currentIndex];
             const numTotal = appState.juego.preguntas.length;
             const currentNum = appState.juego.currentIndex + 1;
